@@ -100,6 +100,13 @@ def CRROptionPricer(S_0, K, r, q, sigma, N, T, option_type, exercise_type, drift
     return value_tree, price_tree
 
 
+def delta_hedging(value_tree, price_tree):
+    delta_tree = np.full_like(value_tree, np.nan)
+    for i in range(delta_tree.shape[1]-1):
+        delta_tree[:i+1, i] = (value_tree[:i+1, i+1] - value_tree[1:i+2, i+1]) / (price_tree[:i+1, i+1] - price_tree[1:i+2, i+1])
+    return delta_tree
+
+
 def exercise_boundary(value_tree, price_tree, K):
     payoff_tree = K - price_tree
     exercised = np.where(value_tree == payoff_tree, 1, 0)
@@ -107,7 +114,7 @@ def exercise_boundary(value_tree, price_tree, K):
     return exercised_price.max(axis=0)
 
 
-if __name__ == '__main__':
+if __name__ == '__main__':    
     S_0 = 10.0
     K = 10.0
     r = 0.02
@@ -121,9 +128,10 @@ if __name__ == '__main__':
     
     exact_price = BSMOptionPricer(S_0, K, r, q, sigma, T, option_type)
     value_tree, price_tree = CRROptionPricer(S_0, K, r, q, sigma, N, T, option_type, exercise_type, drift)
+    delta_tree = delta_hedging(value_tree, price_tree)
     
     print(exact_price)
-    print(value_tree[0, 0])
+    print(value_tree[0, 0], delta_tree[0, 0])
     
     boundary = exercise_boundary(value_tree, price_tree, K)
     boundary_for_plot = [x for x in boundary if x >= 0.0]
