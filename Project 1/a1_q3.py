@@ -77,9 +77,9 @@ def CRROptionPricer(S_0, K, r, q, sigma, N, T, option_type, exercise_type, drift
     q_d = 1 - q_u
     
     # binomial tree for asset price
-    price_tree = np.full((N, N), np.nan)
+    price_tree = np.full((N+1, N+1), np.nan)
     price_tree[0, 0] = S_0
-    for i in range(1, N):
+    for i in range(1, N+1):
         price_tree[:i, i] = u * price_tree[:i, i-1]
         price_tree[i, i] = d * price_tree[i-1, i-1]
     
@@ -89,7 +89,7 @@ def CRROptionPricer(S_0, K, r, q, sigma, N, T, option_type, exercise_type, drift
         value_tree[:, -1] = np.maximum(0, price_tree[:, -1] - K)
     else:
         value_tree[:, -1] = np.maximum(0, K - price_tree[:, -1])
-    for i in range(N-1, 0, -1):
+    for i in range(N, 0, -1):
         value_tree[:i, i-1] = discount_rate * (q_u * value_tree[:i, i] + q_d * value_tree[1:i+1, i])
         if exercise_type == 'american':
             if option_type == 'call':
@@ -115,17 +115,30 @@ def exercise_boundary(value_tree, price_tree, K):
     return exercised_price.max(axis=0)
 
 
+def sim(S_0, r, mu, sigma, N, T, N_paths):
+    delta_t = T / N
+    p = 0.5 * (1 + (mu - r - 0.5*sigma**2) * np.sqrt(delta_t) / sigma)
+    paths = np.full((N_paths, N+1), np.nan)
+    paths[:, 0] = S_0
+    for i in range(N):
+        U = np.random.rand(N_paths)
+        epsilon = (U < p) - (U >= p)
+        paths[:, i+1] = paths[:, i] * np.exp(r*delta_t + sigma*np.sqrt(delta_t)*epsilon)
+    return paths
+
+
 if __name__ == '__main__':    
     S_0 = 10.0
     K = 10.0
     r = 0.02
     q = 0.0
     sigma = 0.2
-    N = 5000
+    N = 5_000
     T = 1.0
     option_type = 'put'
     exercise_type = 'american'
     drift = r
+    N_paths = 10_000
     
     exact_price = BSMOptionPricer(S_0, K, r, q, sigma, T, option_type)
     value_tree, price_tree = CRROptionPricer(S_0, K, r, q, sigma, N, T, option_type, exercise_type, drift)
@@ -136,7 +149,7 @@ if __name__ == '__main__':
     
     boundary = exercise_boundary(value_tree, price_tree, K)
     boundary_for_plot = [x for x in boundary if x >= 0.0]
-    ts = np.linspace(0, 1, N, endpoint=True)[-len(boundary_for_plot):]
+    ts = np.linspace(0, 1, N+1, endpoint=True)[-len(boundary_for_plot):]
     
     fig, ax = plt.subplots()
     ax.plot(ts, boundary_for_plot)
@@ -149,7 +162,7 @@ if __name__ == '__main__':
     plt.show()
     
     fig, ax = plt.subplots()
-    for t in (0, 1/4, 1/2, 3/4):
+    for t in (0, 1/4, 1/2, 3/4, 1):
         ax.plot(price_tree[:, int(N*t/T)], delta_tree[:, int(N*t/T)], label=f"$t = {{{t}}}$")
     fig.suptitle("American Put Option Hedging Strategy - Risky Asset")
     plt.xlabel('spot price (S)')
@@ -161,7 +174,7 @@ if __name__ == '__main__':
     plt.show()
     
     fig, ax = plt.subplots()
-    for t in (0, 1/4, 1/2, 3/4):
+    for t in (0, 1/4, 1/2, 3/4, 1):
         ax.plot(price_tree[:, int(N*t/T)], bank_tree[:, int(N*t/T)], label=f"$t = {{{t}}}$")
     fig.suptitle("American Put Option Hedging Strategy - Bank Account")
     plt.xlabel('spot price (S)')
