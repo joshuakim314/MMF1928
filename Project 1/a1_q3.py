@@ -146,3 +146,15 @@ if __name__ == '__main__':
     # ax.set_ylim(bottom=0.0)
     # fig.savefig('exercise_boundary.png')
     plt.show()
+    
+    fig, ax = plt.subplots()
+    for t in (0, 1/4, 1/2, 3/4):
+        ax.plot(price_tree[:, int(N*t/T)], delta_tree[:, int(N*t/T)], label=f"$t = {{{t}}}$")
+    fig.suptitle("American Put Option Hedging Strategy")
+    plt.xlabel('spot price (S)')
+    plt.ylabel('number of units of asset')
+    ax.set_xlim(left=0.0, right=20.0)
+    ax.legend()
+    plt.tight_layout()
+    # fig.savefig('hedging_strategy.png')
+    plt.show()
