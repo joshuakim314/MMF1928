@@ -104,7 +104,8 @@ def delta_hedging(value_tree, price_tree):
     delta_tree = np.full_like(value_tree, np.nan)
     for i in range(delta_tree.shape[1]-1):
         delta_tree[:i+1, i] = (value_tree[:i+1, i+1] - value_tree[1:i+2, i+1]) / (price_tree[:i+1, i+1] - price_tree[1:i+2, i+1])
-    return delta_tree
+    bank_tree = value_tree - delta_tree * price_tree
+    return delta_tree, bank_tree
 
 
 def exercise_boundary(value_tree, price_tree, K):
@@ -128,7 +129,7 @@ if __name__ == '__main__':
     
     exact_price = BSMOptionPricer(S_0, K, r, q, sigma, T, option_type)
     value_tree, price_tree = CRROptionPricer(S_0, K, r, q, sigma, N, T, option_type, exercise_type, drift)
-    delta_tree = delta_hedging(value_tree, price_tree)
+    delta_tree, bank_tree = delta_hedging(value_tree, price_tree)
     
     print(exact_price)
     print(value_tree[0, 0], delta_tree[0, 0])
@@ -150,11 +151,23 @@ if __name__ == '__main__':
     fig, ax = plt.subplots()
     for t in (0, 1/4, 1/2, 3/4):
         ax.plot(price_tree[:, int(N*t/T)], delta_tree[:, int(N*t/T)], label=f"$t = {{{t}}}$")
-    fig.suptitle("American Put Option Hedging Strategy")
+    fig.suptitle("American Put Option Hedging Strategy - Risky Asset")
     plt.xlabel('spot price (S)')
     plt.ylabel('number of units of asset')
     ax.set_xlim(left=0.0, right=20.0)
     ax.legend()
     plt.tight_layout()
-    # fig.savefig('hedging_strategy.png')
+    # fig.savefig('hedging_strategy_risky_asset.png')
+    plt.show()
+    
+    fig, ax = plt.subplots()
+    for t in (0, 1/4, 1/2, 3/4):
+        ax.plot(price_tree[:, int(N*t/T)], bank_tree[:, int(N*t/T)], label=f"$t = {{{t}}}$")
+    fig.suptitle("American Put Option Hedging Strategy - Bank Account")
+    plt.xlabel('spot price (S)')
+    plt.ylabel('number of units of asset')
+    ax.set_xlim(left=0.0, right=20.0)
+    ax.legend()
+    plt.tight_layout()
+    # fig.savefig('hedging_strategy_bank_account.png')
     plt.show()
