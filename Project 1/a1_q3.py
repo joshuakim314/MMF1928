@@ -122,16 +122,30 @@ def sim(S_0, r, mu, sigma, N, T, N_paths):
     paths[:, 0] = S_0
     for i in range(N):
         U = np.random.rand(N_paths)
-        epsilon = (U < p) - (U >= p)
+        epsilon = (+1)*(U < p) + (-1)*(U >= p)
         paths[:, i+1] = paths[:, i] * np.exp(r*delta_t + sigma*np.sqrt(delta_t)*epsilon)
     return paths
 
 
-if __name__ == '__main__':    
+def generate_pnl(paths, boundary, V_0, K, r, N, T):
+    exercised = np.where(paths <= boundary, 1, 0)
+    exercised[:, -1] = 1
+    exercised_time = np.argmax(exercised == 1, axis=1)
+    pnl = []
+    delta_t = T / N
+    for i, n in enumerate(exercised_time):
+        pnl.append(np.exp(-r * delta_t * n) * np.maximum(K - paths[i][n], 0) - V_0)
+    return pnl
+
+
+if __name__ == '__main__':
+    np.random.seed(1928)
+    
     S_0 = 10.0
     K = 10.0
     r = 0.02
     q = 0.0
+    mu = 0.05
     sigma = 0.2
     N = 5_000
     T = 1.0
@@ -157,30 +171,82 @@ if __name__ == '__main__':
     plt.xlabel('time (t)')
     plt.ylabel('asset price (S)')
     plt.tight_layout()
-    # ax.set_ylim(bottom=0.0)
-    # fig.savefig('exercise_boundary.png')
-    plt.show()
+    fig.savefig('exercise_boundary.png')
+    # plt.show()
     
     fig, ax = plt.subplots()
-    for t in (0, 1/4, 1/2, 3/4, 1):
+    for t in (0, 1/4, 1/2, 3/4):
         ax.plot(price_tree[:, int(N*t/T)], delta_tree[:, int(N*t/T)], label=f"$t = {{{t}}}$")
+    ax.plot(price_tree[:, int(N/T)], np.where(price_tree[:, int(N/T)] <= 10, -1, 0), label=f"$t = 1$")  # t = 1
     fig.suptitle("American Put Option Hedging Strategy - Risky Asset")
     plt.xlabel('spot price (S)')
-    plt.ylabel('number of units of asset')
+    plt.ylabel('number of shares')
     ax.set_xlim(left=0.0, right=20.0)
     ax.legend()
     plt.tight_layout()
-    # fig.savefig('hedging_strategy_risky_asset.png')
-    plt.show()
+    fig.savefig('hedging_strategy_risky_asset.png')
+    # plt.show()
     
     fig, ax = plt.subplots()
-    for t in (0, 1/4, 1/2, 3/4, 1):
+    for t in (0, 1/4, 1/2, 3/4):
         ax.plot(price_tree[:, int(N*t/T)], bank_tree[:, int(N*t/T)], label=f"$t = {{{t}}}$")
+    ax.plot(price_tree[:, int(N/T)], np.where(price_tree[:, int(N/T)] <= 10, S_0, 0), label=f"$t = 1$")  # t = 1
     fig.suptitle("American Put Option Hedging Strategy - Bank Account")
     plt.xlabel('spot price (S)')
-    plt.ylabel('number of units of asset')
+    plt.ylabel('dollar value ($)')
     ax.set_xlim(left=0.0, right=20.0)
     ax.legend()
     plt.tight_layout()
-    # fig.savefig('hedging_strategy_bank_account.png')
+    fig.savefig('hedging_strategy_bank_account.png')
+    # plt.show()
+    
+    sigma_list = [[0.10, 0.15], [0.25, 0.30]]
+    fig, axs = plt.subplots(2, 2, sharex=True, sharey=True)
+    for i in range(2):
+        for j in range(2):
+            value_tree, price_tree = CRROptionPricer(S_0, K, r, q, sigma_list[i][j], N, T, option_type, exercise_type, drift)
+            delta_tree, bank_tree = delta_hedging(value_tree, price_tree)
+            for t in (0, 1/4, 1/2, 3/4):
+                axs[i, j].plot(price_tree[:, int(N*t/T)], delta_tree[:, int(N*t/T)], label=f"$t = {{{t}}}$")
+            axs[i, j].plot(price_tree[:, int(N/T)], np.where(price_tree[:, int(N/T)] <= 10, -1, 0), label=f"$t = 1$")  # t = 1
+            # axs[i, j].set(xlabel='spot price (S)', ylabel='number of shares')
+            axs[i, j].set_xlim(left=0.0, right=20.0)
+            axs[i, j].set_title(f"$\sigma = {{{sigma_list[i][j]}}}$")
+            axs[i, j].legend(fontsize="x-small")
+    # fig.suptitle(f"American Put Option Hedging Strategy for Various $\sigma$")
+    plt.setp(axs[-1, :], xlabel='spot price (S)')
+    plt.setp(axs[:, 0], ylabel='number of shares')
+    plt.tight_layout()
+    fig.savefig('hedging_strategy_risky_asset_sigmas.png')
+    # plt.show()
+    
+    r_list = [[0.00, 0.01], [0.05, 0.10]]
+    fig, axs = plt.subplots(2, 2, sharex=True, sharey=True)
+    for i in range(2):
+        for j in range(2):
+            value_tree, price_tree = CRROptionPricer(S_0, K, r_list[i][j], q, sigma, N, T, option_type, exercise_type, drift)
+            delta_tree, bank_tree = delta_hedging(value_tree, price_tree)
+            for t in (0, 1/4, 1/2, 3/4):
+                axs[i, j].plot(price_tree[:, int(N*t/T)], delta_tree[:, int(N*t/T)], label=f"$t = {{{t}}}$")
+            axs[i, j].plot(price_tree[:, int(N/T)], np.where(price_tree[:, int(N/T)] <= 10, -1, 0), label=f"$t = 1$")  # t = 1
+            # axs[i, j].set(xlabel='spot price (S)', ylabel='number of shares')
+            axs[i, j].set_xlim(left=0.0, right=20.0)
+            axs[i, j].set_title(f"$r = {{{r_list[i][j]}}}$")
+            axs[i, j].legend(fontsize="x-small")
+    # fig.suptitle(f"American Put Option Hedging Strategy for Various $r$")
+    plt.setp(axs[-1, :], xlabel='spot price (S)')
+    plt.setp(axs[:, 0], ylabel='number of shares')
+    plt.tight_layout()
+    fig.savefig('hedging_strategy_risky_asset_rs.png')
+    # plt.show()
+    
+    paths = sim(S_0, r, mu, sigma, N, T, N_paths)
+    fig, ax = plt.subplots()
+    ax.plot(paths.T, c='b', alpha=1/255)
+    plt.show()
+    
+    pnl = generate_pnl(paths, boundary, value_tree[0, 0], K, r, N, T)
+    # print(np.sum(pnl) / N_paths)
+    fig, ax = plt.subplots()
+    ax.hist([x for x in pnl if x > -value_tree[0, 0]], bins=20)
     plt.show()
